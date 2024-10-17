@@ -4,13 +4,14 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import platform
 
 # 하이퍼파라미터 설정
 batch_size = 32
 learning_rate = 0.001
 epochs = 10
+train_ratio = 0.8  # 학습 데이터와 테스트 데이터 비율 설정
 
 # 데이터셋 준비
 data_transform = transforms.Compose([
@@ -19,10 +20,12 @@ data_transform = transforms.Compose([
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
-train_dataset = datasets.ImageFolder(root='./datasets/train', transform=data_transform)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+dataset = datasets.ImageFolder(root='./datasets/data', transform=data_transform)
+train_size = int(train_ratio * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-test_dataset = datasets.ImageFolder(root='./datasets/test', transform=data_transform)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # 모델 정의
