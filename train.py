@@ -6,6 +6,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader, random_split
 import platform
+from tqdm import tqdm
 
 # 하이퍼파라미터 설정
 batch_size = 32
@@ -20,7 +21,7 @@ data_transform = transforms.Compose([
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
-dataset = datasets.ImageFolder(root='./datasets/data', transform=data_transform)
+dataset = datasets.ImageFolder(root='./datasets', transform=data_transform)
 train_size = int(train_ratio * len(dataset))
 test_size = len(dataset) - train_size
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
@@ -55,7 +56,7 @@ model = CNNClassifier().to(device)
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'cnn_classifier.pth'
 try:
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     print(f'Model loaded from {model_path}')
 except FileNotFoundError:
     print(f'No saved model found at {model_path}, training from scratch.')
@@ -69,7 +70,7 @@ def train():
     model.train()
     for epoch in range(epochs):
         running_loss = 0.0
-        for i, (inputs, labels) in enumerate(train_loader, 0):
+        for i, (inputs, labels) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}")):
             inputs, labels = inputs.to(device), labels.to(device)
 
             # 옵티마이저 초기화
@@ -81,12 +82,6 @@ def train():
             loss.backward()
             optimizer.step()
 
-            # 통계 출력
-            running_loss += loss.item()
-            if i % 100 == 99:  # 매 100 미니배치마다 출력
-                print(f'Epoch [{epoch + 1}/{epochs}], Step [{i + 1}], Loss: {running_loss / 100:.4f}')
-                running_loss = 0.0
-
     # 모델 저장
     torch.save(model.state_dict(), 'cnn_classifier.pth')
 
@@ -96,7 +91,7 @@ def test():
     correct = 0
     total = 0
     with torch.no_grad():
-        for inputs, labels in test_loader:
+        for inputs, labels in tqdm(test_loader, desc="Testing"):
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
@@ -104,6 +99,15 @@ def test():
             correct += (predicted == labels).sum().item()
 
     print(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
+
+def recog():
+    model.eval()
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, desc="Testing"):
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            print(predicted)
 
 # 실행
 if __name__ == "__main__":
