@@ -9,7 +9,7 @@ import platform
 from tqdm import tqdm
 
 # 하이퍼파라미터 설정
-batch_size = 32
+batch_size = 256
 learning_rate = 0.001
 epochs = 10
 train_ratio = 0.8  # 학습 데이터와 테스트 데이터 비율 설정
