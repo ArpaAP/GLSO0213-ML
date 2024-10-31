@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
-from torch.utils.data import DataLoader, random_split
+import os
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader, random_split
 import platform
 from tqdm import tqdm
+import numpy as np
 
 # 하이퍼파라미터 설정
 batch_size = 256
@@ -14,14 +15,48 @@ learning_rate = 0.001
 epochs = 10
 train_ratio = 0.8  # 학습 데이터와 테스트 데이터 비율 설정
 
-# 데이터셋 준비
-data_transform = transforms.Compose([
-    transforms.Resize((128, 128)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+# 사용자 정의 데이터셋 클래스 정의
+class CustomImageDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.image_paths = []
+        self.labels = []
+        self.classes = sorted(os.listdir(root_dir))
+        
+        for label, class_name in enumerate(self.classes):
+            class_dir = os.path.join(root_dir, class_name)
+            if os.path.isdir(class_dir):
+                for img_name in os.listdir(class_dir):
+                    img_path = os.path.join(class_dir, img_name)
+                    if img_path.endswith(('.png', '.jpg', '.jpeg')):
+                        self.image_paths.append(img_path)
+                        self.labels.append(label)
 
-dataset = datasets.ImageFolder(root='./datasets', transform=data_transform)
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        image = Image.open(img_path).convert('RGB')
+        label = self.labels[idx]
+        
+        if self.transform:
+            image = self.transform(image)
+        
+        return image, label
+
+# 이미지 전처리 함수 정의
+def custom_transform(image):
+    # 이미지 크기 조정 및 텐서 변환
+    image = image.resize((128, 128))
+    image = np.array(image).astype(np.float32) / 255.0
+    image = (image - 0.5) / 0.5  # Normalize to range [-1, 1]
+    image = torch.tensor(image).permute(2, 0, 1)  # Change to (C, H, W)
+    return image
+
+# 데이터셋 준비
+dataset = CustomImageDataset(root_dir='./datasets', transform=custom_transform)
 train_size = int(train_ratio * len(dataset))
 test_size = len(dataset) - train_size
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
@@ -99,15 +134,6 @@ def test():
             correct += (predicted == labels).sum().item()
 
     print(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
-
-def recog():
-    model.eval()
-    with torch.no_grad():
-        for inputs, labels in tqdm(test_loader, desc="Testing"):
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            print(predicted)
 
 # 실행
 if __name__ == "__main__":
