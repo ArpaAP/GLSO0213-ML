@@ -12,10 +12,12 @@ import numpy as np
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # 하이퍼파라미터 설정
-batch_size = 32
+batch_size = 64
 learning_rate = 0.001
 epochs = 50
-train_ratio = 0.8  # 학습 데이터와 테스트 데이터 비율 설정
+train_ratio = 0.7
+val_ratio = 0.15
+test_ratio = 0.15  # 학습 데이터와 테스트 데이터 비율 설정
 image_size = (128, 128)  # 이미지 크기 설정
 patience = 5  # 조기 종료를 위한 검증 손실 개선 횟수 제한
 
@@ -60,12 +62,17 @@ def custom_transform(image):
     return image
 
 # 데이터셋 준비
+
 dataset = CustomImageDataset(root_dir='./datasets', transform=custom_transform)
+
+# 데이터셋 준비 (훈련, 검증, 테스트로 분리)
 train_size = int(train_ratio * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+val_size = int(val_ratio * len(dataset))
+test_size = len(dataset) - train_size - val_size
+train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 
 # 모델 정의 (더 큰 모델로 수정, 드롭아웃 및 배치 정규화 추가)
@@ -172,13 +179,13 @@ def validate():
     model.eval()
     running_loss = 0.0
     with torch.no_grad():
-        for inputs, labels in test_loader:
+        for inputs, labels in val_loader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             running_loss += loss.item()
 
-    return running_loss / len(test_loader)
+    return running_loss / len(val_loader)
 
 # 모델 테스트
 def test():
