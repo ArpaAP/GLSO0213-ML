@@ -105,7 +105,7 @@ model = CNNClassifier().to(device)
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
-if torch.utils.data.get_worker_info() is None:  # 메인 프로세스인 경우에만 출력
+if __name__ == "__main__":  # 메인 프로세스에서만 실행
     try:
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
         print(f'Model loaded from {model_path}')
