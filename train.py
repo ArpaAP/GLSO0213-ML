@@ -5,9 +5,11 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 import platform
 from tqdm import tqdm
-from PIL import Image
+from PIL import Image, ImageFile
 import os
 import numpy as np
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # 하이퍼파라미터 설정
 batch_size = 32
