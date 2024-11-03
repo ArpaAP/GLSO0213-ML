@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+
 from PIL import Image
 import os
 import platform
@@ -72,6 +73,19 @@ def predict_image(image_path):
 
 # 실행 부분
 if __name__ == '__main__':
-    image_path = input('이미지 경로를 입력하세요: ')
-    predicted_class = predict_image(image_path)
-    print(f'예측된 클래스: {predicted_class}')
+    folder_path = "./test"
+    output_file = 'results.txt'
+
+    with open(output_file, 'w') as f:
+        for filename in os.listdir(folder_path):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                image_path = os.path.join(folder_path, filename)
+                try:
+                    predicted_class = predict_image(image_path)
+                    f.write(f'{filename}: {predicted_class}\n')
+                    print(f'{filename}: {predicted_class}')
+                except Exception as e:
+                    print(f'이미지 처리 중 오류 발생 - {filename}: {e}')
+                    f.write(f'{filename}: Error\n')
+
+    print(f'\n결과가 {output_file} 파일에 저장되었습니다.')
