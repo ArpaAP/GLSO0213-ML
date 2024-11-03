@@ -45,7 +45,7 @@ class CustomImageDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         
-        return image, label
+        return image, torch.tensor(label, dtype=torch.long)
 
 # 이미지 전처리 함수 정의
 def custom_transform(image):
@@ -117,6 +117,9 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)  
 def train():
     model.train()
     for epoch in range(epochs):
+        running_loss = 0.0
+        correct = 0
+        total = 0
         for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             inputs, labels = inputs.to(device), labels.to(device)
 
@@ -128,6 +131,17 @@ def train():
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+
+            # 손실 및 정확도 계산
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        
+        # 에포크별 손실과 정확도 출력
+        epoch_loss = running_loss / len(train_loader)
+        epoch_accuracy = 100 * correct / total
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%')
         
         # 학습률 스케줄러 업데이트
         scheduler.step()
@@ -140,15 +154,20 @@ def test():
     model.eval()
     correct = 0
     total = 0
+    running_loss = 0.0
     with torch.no_grad():
         for inputs, labels in tqdm(test_loader, desc="Testing"):
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            running_loss += loss.item()
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-    print(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
+    avg_loss = running_loss / len(test_loader)
+    accuracy = 100 * correct / total
+    print(f'Test Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%')
 
 # 실행
 if __name__ == "__main__":
