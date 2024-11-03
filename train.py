@@ -12,9 +12,10 @@ import numpy as np
 # 하이퍼파라미터 설정
 batch_size = 32
 learning_rate = 0.001
-epochs = 10
+epochs = 50
 train_ratio = 0.8  # 학습 데이터와 테스트 데이터 비율 설정
 image_size = (128, 128)  # 이미지 크기 설정
+patience = 5  # 조기 종료를 위한 검증 손실 개선 횟수 제한
 
 # 사용자 정의 데이터셋 클래스 정의
 class CustomImageDataset(Dataset):
@@ -62,8 +63,8 @@ train_size = int(train_ratio * len(dataset))
 test_size = len(dataset) - train_size
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 
 # 모델 정의 (더 큰 모델로 수정, 드롭아웃 및 배치 정규화 추가)
 class CNNClassifier(nn.Module):
@@ -102,19 +103,24 @@ model = CNNClassifier().to(device)
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
-try:
-    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-    print(f'Model loaded from {model_path}')
-except FileNotFoundError:
-    print(f'No saved model found at {model_path}, training from scratch.')
+if torch.utils.data.get_worker_info() is None:  # 메인 프로세스인 경우에만 출력
+    try:
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+        print(f'Model loaded from {model_path}')
+    except FileNotFoundError:
+        print(f'No saved model found at {model_path}, training from scratch.')
 
 # 손실 함수 및 옵티마이저 설정
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)  # 학습률 스케줄러 추가
 
+best_val_loss = np.inf
+patience_counter = 0
+
 # 모델 학습
 def train():
+    global best_val_loss, patience_counter
     model.train()
     for epoch in range(epochs):
         running_loss = 0.0
@@ -143,11 +149,34 @@ def train():
         epoch_accuracy = 100 * correct / total
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%')
         
+        # 검증 손실 확인 후 조기 종료
+        val_loss = validate()
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+            torch.save(model.state_dict(), 'model.pth')  # 모델 저장
+        else:
+            patience_counter += 1
+
+        if patience_counter >= patience:
+            print("Early stopping triggered")
+            break
+        
         # 학습률 스케줄러 업데이트
         scheduler.step()
 
-    # 모델 저장
-    torch.save(model.state_dict(), 'model.pth')
+# 모델 검증
+def validate():
+    model.eval()
+    running_loss = 0.0
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            running_loss += loss.item()
+
+    return running_loss / len(test_loader)
 
 # 모델 테스트
 def test():
