@@ -19,38 +19,32 @@ def custom_transform(image):
 class CNNClassifier(nn.Module):
     def __init__(self):
         super(CNNClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # 필터 수 증가
-        self.bn1 = nn.BatchNorm2d(64)  # 배치 정규화 추가
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)  # 필터 수 증가
-        self.bn2 = nn.BatchNorm2d(128)  # 배치 정규화 추가
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)  # 필터 수 증가
-        self.bn3 = nn.BatchNorm2d(256)  # 배치 정규화 추가
-        self.conv4 = nn.Conv2d(256, 512, kernel_size=3, padding=1)  # 추가 합성곱 계층
-        self.bn4 = nn.BatchNorm2d(512)  # 배치 정규화 추가
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)  # 필터 수 줄임
+        self.bn1 = nn.BatchNorm2d(32)  # 배치 정규화
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)  # 필터 수 줄임
+        self.bn2 = nn.BatchNorm2d(64)  # 배치 정규화
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)  # 추가 합성곱 계층
+        self.bn3 = nn.BatchNorm2d(128)  # 배치 정규화
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.dropout = nn.Dropout(p=0.5)  # 드롭아웃 추가 (50% 확률)
-        self.fc1 = nn.Linear(512 * 8 * 8, 1024)  # 출력 채널 수 및 뉴런 수 증가
-        self.fc2 = nn.Linear(1024, 512)  # 추가 전결합 계층
-        self.fc3 = nn.Linear(512, 5)  # 최종 클래스 수 유지
+        self.fc1 = nn.Linear(128 * 16 * 16, 512)  # 완전 연결 계층
+        self.fc2 = nn.Linear(512, 5)  # 5개의 클래스
 
     def forward(self, x):
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
         x = self.pool(F.relu(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        x = self.pool(F.relu(self.bn4(self.conv4(x))))
-        x = x.view(-1, 512 * 8 * 8)
+        x = x.view(-1, 128 * 16 * 16)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)  # 드롭아웃 적용
-        x = F.relu(self.fc2(x))
-        x = self.dropout(x)  # 드롭아웃 적용
-        x = self.fc3(x)
+        x = self.fc2(x)
         return x
 
 # 모델 초기화 및 로드
 device = torch.device('mps' if torch.backends.mps.is_available() and platform.system() == 'Darwin' else ('cuda' if torch.cuda.is_available() else 'cpu'))
 model = CNNClassifier().to(device)
 model_path = 'model.pth'
-model.load_state_dict(torch.load(model_path, map_location=device))
+model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
 model.eval()
 
 # 클래스 이름 로드 (데이터셋 디렉토리의 서브폴더 이름 사용)

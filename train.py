@@ -14,7 +14,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # 하이퍼파라미터 설정
 batch_size = 64
 learning_rate = 0.001
-epochs = 50
+epochs = 20
 train_ratio = 0.7
 val_ratio = 0.15
 test_ratio = 0.15  # 학습 데이터와 테스트 데이터 비율 설정
@@ -62,7 +62,6 @@ def custom_transform(image):
     return image
 
 # 데이터셋 준비
-
 dataset = CustomImageDataset(root_dir='./datasets', transform=custom_transform)
 
 # 데이터셋 준비 (훈련, 검증, 테스트로 분리)
@@ -71,44 +70,39 @@ val_size = int(val_ratio * len(dataset))
 test_size = len(dataset) - train_size - val_size
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6, persistent_workers=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=6, persistent_workers=True)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=6, persistent_workers=True)
 
 # 모델 정의 (더 큰 모델로 수정, 드롭아웃 및 배치 정규화 추가)
 class CNNClassifier(nn.Module):
     def __init__(self):
         super(CNNClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # 필터 수 증가
-        self.bn1 = nn.BatchNorm2d(64)  # 배치 정규화 추가
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)  # 필터 수 증가
-        self.bn2 = nn.BatchNorm2d(128)  # 배치 정규화 추가
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)  # 필터 수 증가
-        self.bn3 = nn.BatchNorm2d(256)  # 배치 정규화 추가
-        self.conv4 = nn.Conv2d(256, 512, kernel_size=3, padding=1)  # 추가 합성곱 계층
-        self.bn4 = nn.BatchNorm2d(512)  # 배치 정규화 추가
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)  # 필터 수 줄임
+        self.bn1 = nn.BatchNorm2d(32)  # 배치 정규화
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)  # 필터 수 줄임
+        self.bn2 = nn.BatchNorm2d(64)  # 배치 정규화
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)  # 추가 합성곱 계층
+        self.bn3 = nn.BatchNorm2d(128)  # 배치 정규화
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.dropout = nn.Dropout(p=0.5)  # 드롭아웃 추가 (50% 확률)
-        self.fc1 = nn.Linear(512 * 8 * 8, 1024)  # 출력 채널 수 및 뉴런 수 증가
-        self.fc2 = nn.Linear(1024, 512)  # 추가 전결합 계층
-        self.fc3 = nn.Linear(512, 5)  # 최종 클래스 수 유지
+        self.fc1 = nn.Linear(128 * 16 * 16, 512)  # 완전 연결 계층
+        self.fc2 = nn.Linear(512, 5)  # 5개의 클래스
 
     def forward(self, x):
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
         x = self.pool(F.relu(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        x = self.pool(F.relu(self.bn4(self.conv4(x))))
-        x = x.view(-1, 512 * 8 * 8)
+        x = x.view(-1, 128 * 16 * 16)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)  # 드롭아웃 적용
-        x = F.relu(self.fc2(x))
-        x = self.dropout(x)  # 드롭아웃 적용
-        x = self.fc3(x)
+        x = self.fc2(x)
         return x
 
 # 모델 초기화
 device = torch.device('mps' if torch.backends.mps.is_available() and platform.system() == 'Darwin' else ('cuda' if torch.cuda.is_available() else 'cpu'))
 model = CNNClassifier().to(device)
+
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
@@ -119,7 +113,7 @@ if __name__ == "__main__":  # 메인 프로세스에서만 실행
     except FileNotFoundError:
         print(f'No saved model found at {model_path}, training from scratch.')
 
-# 손실 함수 및 옵티마이저 설정
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)  # 학습률 스케줄러 추가
