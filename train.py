@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision import transforms
+from torchvision.datasets import ImageFolder
+from torch.utils.data import DataLoader, random_split
 import platform
 from tqdm import tqdm
-from PIL import Image, ImageFile
 import os
 import numpy as np
-
-ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # 하이퍼파라미터 설정
 batch_size = 64
@@ -21,48 +20,17 @@ test_ratio = 0.15  # 학습 데이터와 테스트 데이터 비율 설정
 image_size = (128, 128)  # 이미지 크기 설정
 patience = 5  # 조기 종료를 위한 검증 손실 개선 횟수 제한
 
-# 사용자 정의 데이터셋 클래스 정의
-class CustomImageDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
-        self.transform = transform
-        self.image_paths = []
-        self.labels = []
-        self.classes = sorted(os.listdir(root_dir))
-
-        for label, class_name in enumerate(self.classes):
-            class_dir = os.path.join(root_dir, class_name)
-            if os.path.isdir(class_dir):
-                for img_name in os.listdir(class_dir):
-                    img_path = os.path.join(class_dir, img_name)
-                    if img_path.endswith(('.png', '.jpg', '.jpeg')):
-                        self.image_paths.append(img_path)
-                        self.labels.append(label)
-
-    def __len__(self):
-        return len(self.image_paths)
-
-    def __getitem__(self, idx):
-        img_path = self.image_paths[idx]
-        image = Image.open(img_path).convert('RGB')
-        label = self.labels[idx]
-        
-        if self.transform:
-            image = self.transform(image)
-        
-        return image, torch.tensor(label, dtype=torch.long)
-
-# 이미지 전처리 함수 정의
-def custom_transform(image):
-    # 이미지 크기 조정 및 텐서 변환
-    image = image.resize(image_size)
-    image = np.array(image).astype(np.float32) / 255.0
-    image = (image - 0.5) / 0.5  # Normalize to range [-1, 1]
-    image = torch.tensor(image).permute(2, 0, 1)  # Change to (C, H, W)
-    return image
+# 이미지 전처리 함수 정의 (torchvision 사용)
+transform = transforms.Compose([
+    transforms.Resize(image_size),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(10),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
 
 # 데이터셋 준비
-dataset = CustomImageDataset(root_dir='./datasets', transform=custom_transform)
+dataset = ImageFolder(root='./datasets', transform=transform)
 
 # 데이터셋 준비 (훈련, 검증, 테스트로 분리)
 train_size = int(train_ratio * len(dataset))
@@ -78,45 +46,29 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num
 class CNNClassifier(nn.Module):
     def __init__(self):
         super(CNNClassifier, self).__init__()
-        # 첫 번째 합성곱 층: 입력 채널 3(RGB 이미지), 출력 채널 32, 커널 크기 3x3
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-
-        # 두 번째 합성곱 층: 입력 채널 32, 출력 채널 64
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-
-        # 세 번째 합성곱 층: 입력 채널 64, 출력 채널 128
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        
-        # 최대 풀링 층: 커널 크기 2x2, 스트라이드 2
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(128)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(256)
         self.pool = nn.MaxPool2d(2, 2)
-        
-        # 완전 연결 층
-        self.fc1 = nn.Linear(128 * 16 * 16, 256)
-        self.fc2 = nn.Linear(256, 128)  # 완전 연결 계층
-        self.fc3 = nn.Linear(128, 4)  # 5개의 클래스
-        
-        # 드롭아웃: 과적합 방지용
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(p=0.15)
+        self.fc1 = nn.Linear(256 * 16 * 16, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 5)
 
     def forward(self, x):
-        # 합성곱과 ReLU 활성화 함수 적용 후 풀링
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))  # 출력 크기: [batch_size, 32, 64, 64]
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))  # 출력 크기: [batch_size, 64, 32, 32]
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))  # 출력 크기: [batch_size, 128, 16, 16]
-        
-        # 특성 맵을 1차원으로 변환
-        x = x.view(-1, 128 * 16 * 16)
-        
-        # 완전 연결 층 통과
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        x = x.view(-1, 256 * 16 * 16)
         x = self.dropout(x)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)  # 활성화 함수는 손실 함수에서 처리하므로 여기서는 적용하지 않음
-        
+        x = self.fc3(x)
+
         return x
 
 # 모델 초기화
@@ -127,7 +79,7 @@ model = CNNClassifier().to(device)
 def calculate_class_weights(dataset):
     class_counts = {}
     for class_name in dataset.classes:
-        class_dir = os.path.join(dataset.root_dir, class_name)
+        class_dir = os.path.join("./datasets", class_name)
         if os.path.isdir(class_dir):
             class_counts[class_name] = len([name for name in os.listdir(class_dir) if os.path.isfile(os.path.join(class_dir, name))])
     
@@ -135,7 +87,8 @@ def calculate_class_weights(dataset):
     class_weights = torch.tensor([total_samples / (len(class_counts) * class_counts[class_name]) for class_name in dataset.classes], dtype=torch.float)
     return class_weights
 
-class_weights = calculate_class_weights(dataset).to(device)
+# class_weights = calculate_class_weights(dataset).to(device)
+class_weights = torch.tensor([0.5622, 1.2077, 1.3411, 1.000, 1.4], dtype=torch.float).to(device)
 
 
 # 기존에 저장된 모델이 있으면 불러오기
@@ -151,7 +104,7 @@ if __name__ == "__main__":  # 메인 프로세스에서만 실행
 
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
-optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=0.1)  # 학습률 스케줄러 추가
 
 best_val_loss = np.inf
