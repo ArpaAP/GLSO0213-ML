@@ -78,45 +78,74 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num
 class CNNClassifier(nn.Module):
     def __init__(self):
         super(CNNClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)  # 필터 수 줄임
-        self.bn1 = nn.BatchNorm2d(32)  # 배치 정규화
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)  # 필터 수 줄임
-        self.bn2 = nn.BatchNorm2d(64)  # 배치 정규화
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)  # 추가 합성곱 계층
-        self.bn3 = nn.BatchNorm2d(128)  # 배치 정규화
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.dropout = nn.Dropout(p=0.5)  # 드롭아웃 추가 (50% 확률)
-        self.fc1 = nn.Linear(128 * 16 * 16, 512)  # 완전 연결 계층
-        self.fc2 = nn.Linear(512, 5)  # 5개의 클래스
+        # 첫 번째 합성곱 층: 입력 채널 3(RGB 이미지), 출력 채널 32, 커널 크기 3x3
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        # 두 번째 합성곱 층: 입력 채널 32, 출력 채널 64
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        # 세 번째 합성곱 층: 입력 채널 64, 출력 채널 128
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        
+        # 최대 풀링 층: 커널 크기 2x2, 스트라이드 2
+        self.pool = nn.MaxPool2d(2, 2)
+        
+        # 완전 연결 층
+        self.fc1 = nn.Linear(128 * 16 * 16, 512)  # 128채널의 16x16 특징 맵을 1차원으로 변환
+        self.fc2 = nn.Linear(512, 4)  # 출력 노드 수는 클래스 수인 5
+        
+        # 드롭아웃: 과적합 방지용
+        self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        # 합성곱과 ReLU 활성화 함수 적용 후 풀링
+        x = self.pool(F.relu(self.conv1(x)))  # 출력 크기: [batch_size, 32, 64, 64]
+        x = self.pool(F.relu(self.conv2(x)))  # 출력 크기: [batch_size, 64, 32, 32]
+        x = self.pool(F.relu(self.conv3(x)))  # 출력 크기: [batch_size, 128, 16, 16]
+        
+        # 특성 맵을 1차원으로 변환
         x = x.view(-1, 128 * 16 * 16)
+        
+        # 완전 연결 층 통과
+        x = self.dropout(x)
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)  # 드롭아웃 적용
-        x = self.fc2(x)
+        x = self.dropout(x)
+        x = self.fc2(x)  # 활성화 함수는 손실 함수에서 처리하므로 여기서는 적용하지 않음
+        
         return x
 
 # 모델 초기화
 device = torch.device('mps' if torch.backends.mps.is_available() and platform.system() == 'Darwin' else ('cuda' if torch.cuda.is_available() else 'cpu'))
 model = CNNClassifier().to(device)
 
+# 클래스 가중치 계산
+def calculate_class_weights(dataset):
+    class_counts = {}
+    for class_name in dataset.classes:
+        class_dir = os.path.join(dataset.root_dir, class_name)
+        if os.path.isdir(class_dir):
+            class_counts[class_name] = len([name for name in os.listdir(class_dir) if os.path.isfile(os.path.join(class_dir, name))])
+    
+    total_samples = sum(class_counts.values())
+    class_weights = torch.tensor([total_samples / (len(class_counts) * class_counts[class_name]) for class_name in dataset.classes], dtype=torch.float)
+    return class_weights
+
+class_weights = calculate_class_weights(dataset).to(device)
+
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
 if __name__ == "__main__":  # 메인 프로세스에서만 실행
     try:
+        print('class weights: ', class_weights)
+
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
         print(f'Model loaded from {model_path}')
     except FileNotFoundError:
         print(f'No saved model found at {model_path}, training from scratch.')
 
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)  # 학습률 스케줄러 추가
+criterion = nn.CrossEntropyLoss(weight=class_weights)
+optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=0.1)  # 학습률 스케줄러 추가
 
 best_val_loss = np.inf
 patience_counter = 0
