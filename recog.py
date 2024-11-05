@@ -7,7 +7,7 @@ import os
 import platform
 import torch.nn.functional as F
 
-# 이미지 전처리 함수 정의 (기존과 동일)
+# 이미지 전처리 함수 정의
 def custom_transform(image):
     image = image.resize((128, 128))
     image = np.array(image).astype(np.float32) / 255.0
@@ -15,7 +15,7 @@ def custom_transform(image):
     image = torch.tensor(image).permute(2, 0, 1)  # Change to (C, H, W)
     return image
 
-# 모델 정의 (기존과 동일)
+# 모델 정의
 class CNNClassifier(nn.Module):
     def __init__(self):
         super(CNNClassifier, self).__init__()
