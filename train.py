@@ -13,7 +13,7 @@ import numpy as np
 # 하이퍼파라미터 설정
 batch_size = 64
 learning_rate = 0.001
-epochs = 20
+epochs = 12
 train_ratio = 0.7
 val_ratio = 0.15
 test_ratio = 0.15  # 학습 데이터와 테스트 데이터 비율 설정
@@ -88,7 +88,7 @@ def calculate_class_weights(dataset):
     return class_weights
 
 # class_weights = calculate_class_weights(dataset).to(device)
-class_weights = torch.tensor([0.5622, 1.2077, 1.3411, 1.000, 1.4], dtype=torch.float).to(device)
+class_weights = torch.tensor([0.5622, 1.2077, 1.3411, 1.220, 1.4], dtype=torch.float).to(device)
 
 
 # 기존에 저장된 모델이 있으면 불러오기
