@@ -1,5 +1,6 @@
 import os
 import shutil
+from tqdm import tqdm
 
 def flatten_and_copy(src_folder, dest_folder):
     if not os.path.exists(dest_folder):
@@ -7,7 +8,7 @@ def flatten_and_copy(src_folder, dest_folder):
 
     file_count = {}
 
-    for root, _, files in os.walk(src_folder):
+    for root, _, files in tqdm(os.walk(src_folder)):
         for file in files:
             src_file_path = os.path.join(root, file)
             dest_file_name = file
@@ -24,7 +25,7 @@ def flatten_and_copy(src_folder, dest_folder):
             shutil.copy2(src_file_path, dest_file_path)
 
 # 예시 사용법
-src_folder = 'D:\\Datasets\\Birds\\train'  # 소스 폴더 경로
-dest_folder = 'D:\\Datasets\\BirdsFlatten'  # 대상 폴더 경로
+src_folder = r'D:\Datasets\한국 차량 이미지'  # 소스 폴더 경로
+dest_folder = r'D:\\Datasets\\CarsFlatten'  # 대상 폴더 경로
 
 flatten_and_copy(src_folder, dest_folder)
