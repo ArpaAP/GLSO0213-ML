@@ -13,7 +13,7 @@ import numpy as np
 # 하이퍼파라미터 설정
 batch_size = 64
 learning_rate = 0.001
-epochs = 12
+epochs = 15
 train_ratio = 0.7
 val_ratio = 0.15
 test_ratio = 0.15  # 학습 데이터와 테스트 데이터 비율 설정
@@ -83,7 +83,8 @@ model = CNNClassifier().to(device)
 # 클래스 가중치 계산
 class_counts = np.bincount([label for _, label in dataset.imgs])
 # class_weights = torch.tensor([len(dataset) / count if count > 0 else 0 for count in class_counts], dtype=torch.float).to(device)
-class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 4.7624, 5.9443], dtype=torch.float).to(device)
+class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 4.9624, 5.9443], dtype=torch.float).to(device)
+class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 5.5, 5.9443], dtype=torch.float).to(device)
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
