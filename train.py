@@ -38,9 +38,9 @@ val_size = int(val_ratio * len(dataset))
 test_size = len(dataset) - train_size - val_size
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6, persistent_workers=True)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=6, persistent_workers=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=6, persistent_workers=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, persistent_workers=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2, persistent_workers=True)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2, persistent_workers=True)
 
 # 모델 정의 (더 큰 모델로 수정, 드롭아웃 및 배치 정규화 추가)
 class CNNClassifier(nn.Module):
