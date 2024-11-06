@@ -57,9 +57,7 @@ model.load_state_dict(torch.load(model_path, map_location=device, weights_only=T
 model.eval()
 
 # 클래스 이름 로드 (데이터셋 디렉토리의 서브폴더 이름 사용)
-root_dir = './datasets'
-class_names = sorted(os.listdir(root_dir))
-print(class_names)
+class_names = ['새', '자동차', '고양이', '개', '물고기']
 
 # 이미지 예측 함수 정의
 def predict_image(image_path):
@@ -71,9 +69,11 @@ def predict_image(image_path):
     
     # 모델을 통해 예측 수행
     outputs = model(image)
+    probabilities = F.softmax(outputs, dim=1)  # 소프트맥스 적용하여 확률 계산
+    probabilities_list = [round(prob, 2) for prob in probabilities.squeeze().tolist()]  # 배치 차원 제거 후 리스트로 변환하고 소수점 둘째 자리까지 반올림
     _, predicted = torch.max(outputs, 1)
     predicted_class = class_names[predicted.item()]
-    return predicted_class
+    return predicted_class, probabilities_list
 
 # 실행 부분
 if __name__ == '__main__':
@@ -82,14 +82,20 @@ if __name__ == '__main__':
 
     with open(output_file, 'w') as f:
         for filename in sorted(os.listdir(folder_path)):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
-                image_path = os.path.join(folder_path, filename)
-                try:
-                    predicted_class = predict_image(image_path)
-                    f.write(f'{filename}: {predicted_class}\n')
-                    print(f'{filename}: {predicted_class}')
-                except Exception as e:
-                    print(f'이미지 처리 중 오류 발생 - {filename}: {e}')
-                    f.write(f'{filename}: Error\n')
+            if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                continue
+
+            image_path = os.path.join(folder_path, filename)
+
+            try:
+                predicted_class, probabilities_list = predict_image(image_path)
+                filename_no_ext = os.path.splitext(filename)[0]
+                filename_padded = filename_no_ext.zfill(3) if len(filename_no_ext) < 3 else filename_no_ext
+                f.write(f'{filename_padded} : {predicted_class}')
+                print(f'{filename_padded} {probabilities_list} {predicted_class}')
+
+            except Exception as e:
+                print(f'이미지 처리 중 오류 발생 - {filename}: {e}')
+                f.write(f'{filename}: Error\n')
 
     print(f'\n결과가 {output_file} 파일에 저장되었습니다.')
