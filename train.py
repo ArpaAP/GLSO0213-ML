@@ -76,32 +76,20 @@ device = torch.device('mps' if torch.backends.mps.is_available() and platform.sy
 model = CNNClassifier().to(device)
 
 # 클래스 가중치 계산
-def calculate_class_weights(dataset):
-    class_counts = {}
-    for class_name in dataset.classes:
-        class_dir = os.path.join("./datasets", class_name)
-        if os.path.isdir(class_dir):
-            class_counts[class_name] = len([name for name in os.listdir(class_dir) if os.path.isfile(os.path.join(class_dir, name))])
-    
-    total_samples = sum(class_counts.values())
-    class_weights = torch.tensor([total_samples / (len(class_counts) * class_counts[class_name]) for class_name in dataset.classes], dtype=torch.float)
-    return class_weights
-
-# class_weights = calculate_class_weights(dataset).to(device)
-class_weights = torch.tensor([0.5622, 1.2077, 1.3411, 1.220, 1.4], dtype=torch.float).to(device)
-
+class_counts = np.bincount([label for _, label in dataset.imgs])
+# class_weights = torch.tensor([len(dataset) / count if count > 0 else 0 for count in class_counts], dtype=torch.float).to(device)
+class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 4.7624, 5.9443], dtype=torch.float).to(device)
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
 if __name__ == "__main__":  # 메인 프로세스에서만 실행
     try:
-        print('class weights: ', class_weights)
+        print(class_weights)
 
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
         print(f'Model loaded from {model_path}')
     except FileNotFoundError:
         print(f'No saved model found at {model_path}, training from scratch.')
-
 
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
@@ -118,6 +106,7 @@ def train():
         running_loss = 0.0
         correct = 0
         total = 0
+
         for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             inputs, labels = inputs.to(device), labels.to(device)
 
