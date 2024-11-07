@@ -83,8 +83,8 @@ model = CNNClassifier().to(device)
 # 클래스 가중치 계산
 class_counts = np.bincount([label for _, label in dataset.imgs])
 # class_weights = torch.tensor([len(dataset) / count if count > 0 else 0 for count in class_counts], dtype=torch.float).to(device)
-class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 4.9624, 5.9443], dtype=torch.float).to(device)
-class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 5.5, 5.9443], dtype=torch.float).to(device)
+# class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 4.9624, 5.9443], dtype=torch.float).to(device)
+class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 5.5, 5.7443], dtype=torch.float).to(device)
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'

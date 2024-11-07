@@ -4,15 +4,14 @@ import numpy as np
 
 from PIL import Image
 import os
-import platform
 import torch.nn.functional as F
 
 # 이미지 전처리 함수 정의
 def custom_transform(image):
     image = image.resize((128, 128))
     image = np.array(image).astype(np.float32) / 255.0
-    image = (image - 0.5) / 0.5  # Normalize to range [-1, 1]
-    image = torch.tensor(image).permute(2, 0, 1)  # Change to (C, H, W)
+    image = (image - 0.5) / 0.5
+    image = torch.tensor(image).permute(2, 0, 1)
     return image
 
 # 모델 정의
@@ -50,13 +49,13 @@ class CNNClassifier(nn.Module):
         return x
 
 # 모델 초기화 및 로드
-device = torch.device('mps' if torch.backends.mps.is_available() and platform.system() == 'Darwin' else ('cuda' if torch.cuda.is_available() else 'cpu'))
+device = 'cpu'
 model = CNNClassifier().to(device)
 model_path = 'model_241107_163900.pth'
 model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
 model.eval()
 
-# 클래스 이름 로드 (데이터셋 디렉토리의 서브폴더 이름 사용)
+# 클래스 이름 로드
 class_names = ['새', '자동차', '고양이', '개', '물고기']
 
 # 이미지 예측 함수 정의
@@ -77,15 +76,15 @@ def predict_image(image_path):
 
 # 실행 부분
 if __name__ == '__main__':
-    folder_path = "./test"
-    output_file = 'results.txt'
+    path = "D:\\images\\images\\"
+    output_file = '002반_02팀.txt'
 
     with open(output_file, 'w') as f:
-        for filename in sorted(os.listdir(folder_path)):
+        for filename in sorted(os.listdir(path)):
             if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
                 continue
 
-            image_path = os.path.join(folder_path, filename)
+            image_path = os.path.join(path, filename)
 
             try:
                 predicted_class, probabilities_list = predict_image(image_path)
@@ -96,6 +95,6 @@ if __name__ == '__main__':
 
             except Exception as e:
                 print(f'이미지 처리 중 오류 발생 - {filename}: {e}')
-                f.write(f'{filename}: Error\n')
+                f.write(f'{filename} : Error\n')
 
     print(f'\n결과가 {output_file} 파일에 저장되었습니다.')
