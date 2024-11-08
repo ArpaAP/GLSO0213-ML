@@ -23,6 +23,7 @@ patience = 5  # 조기 종료를 위한 검증 손실 개선 횟수 제한
 # 이미지 전처리 함수 정의 (torchvision 사용)
 transform = transforms.Compose([
     transforms.Resize(image_size),
+    transforms.CenterCrop(image_size),
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(10),
     transforms.ToTensor(),
@@ -38,7 +39,7 @@ val_size = int(val_ratio * len(dataset))
 test_size = len(dataset) - train_size - val_size
 train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, persistent_workers=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6, persistent_workers=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2, persistent_workers=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2, persistent_workers=True)
 
@@ -84,7 +85,8 @@ model = CNNClassifier().to(device)
 class_counts = np.bincount([label for _, label in dataset.imgs])
 # class_weights = torch.tensor([len(dataset) / count if count > 0 else 0 for count in class_counts], dtype=torch.float).to(device)
 # class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 4.9624, 5.9443], dtype=torch.float).to(device)
-class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 5.5, 5.7443], dtype=torch.float).to(device)
+# class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 5.5, 5.9443], dtype=torch.float).to(device)
+class_weights = torch.tensor([5.2674, 4.8724, 5.0905, 5.3, 4.9443], dtype=torch.float).to(device)
 
 # 기존에 저장된 모델이 있으면 불러오기
 model_path = 'model.pth'
